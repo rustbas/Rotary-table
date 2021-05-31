@@ -13,6 +13,7 @@ class rotary_table_2d:
         self.rate_history = [[0], [0]]
         self.accel_history = [[0], [0]]
         self.time_history = [0]
+        self.direct_key = 0
 
     def POS(self, AxisNumber, Position, Rate=100):
 
@@ -37,6 +38,7 @@ class rotary_table_2d:
             self.T += self.DT
             self.time_history += [self.T]
 
+        print(self.cur_pos)
         self.rate = [0, 0]
 
     def PRS(self, AxisNumber, Position, Rate=10):
@@ -49,12 +51,17 @@ class rotary_table_2d:
             raise ValueError("Неправильный номер оси вращения")
 
         self.rate[AxisNumber - 1] = Rate
+        self.direct_key = 0
 
-        while (abs(Position - self.cur_pos[AxisNumber - 1]) > 1e-2):
-            if Position > self.cur_pos[AxisNumber - 1]:
-                self.cur_pos[AxisNumber - 1] += Rate * self.DT
+        while (abs(Position - self.cur_pos[AxisNumber - 1]) > 1e-1):
+            print(abs(360 - Position), abs(Position -
+                                           self.cur_pos[AxisNumber - 1]), self.direct_key)
+            if abs(0 - Position) > abs(Position - self.cur_pos[AxisNumber - 1]) and (self.direct_key == 0):
+                self.direct_key = 1
             else:
-                self.cur_pos[AxisNumber - 1] -= Rate * self.DT
+                self.direct_key = -1
+            self.cur_pos[AxisNumber -
+                         1] += self.direct_key * self.rate[AxisNumber - 1] * self.DT
             self.check_pos()
             self.pos_history[0] += [self.cur_pos[0]]
             self.pos_history[1] += [self.cur_pos[1]]
@@ -82,16 +89,21 @@ class rotary_table_2d:
         if AxisNumber not in (1, 2):
             raise ValueError("Неправильный номер оси вращения")
 
-        while (abs(Position - self.cur_pos[AxisNumber - 1]) > 1e-2):
+        self.direct_key = 0
+
+        while (abs(Position - self.cur_pos[AxisNumber - 1]) % 360 > 1e-2):
             if self.rate[AxisNumber - 1] < Rate:
                 self.rate[AxisNumber - 1] += Acceleration * self.DT
-            if Position > self.cur_pos[AxisNumber - 1]:
-                self.cur_pos[AxisNumber -
-                             1] += self.rate[AxisNumber - 1] * self.DT
+
+            if (abs(0 - Position) > abs(Position - self.cur_pos[AxisNumber - 1]) or \
+                abs(360 - Position) > abs(Position - self.cur_pos[AxisNumber - 1])) and self.direct_key == 0:
+                self.direct_key = 1
             else:
-                self.cur_pos[AxisNumber -
-                             1] -= self.rate[AxisNumber - 1] * self.DT
+                self.direct_key = -1
+            self.cur_pos[AxisNumber -
+                         1] += self.direct_key * self.rate[AxisNumber - 1] * self.DT
             self.check_pos()
+            #print(self.rate[AxisNumber - 1], self.cur_pos[AxisNumber - 1], 360 - abs(self.cur_pos[0]))
             self.pos_history[0] += [self.cur_pos[0]]
             self.pos_history[1] += [self.cur_pos[1]]
             self.rate_history[0] += [self.rate[0]]
@@ -151,7 +163,8 @@ class rotary_table_2d:
         T_start = self.T
 
         while (self.T - T_start < TMODEL):
-            self.rate[AxisNumber - 1] = 2*pi*Freq*Amp *                 sin(2*pi*Freq*(self.T - T_start) + Phase/57.3)
+            self.rate[AxisNumber - 1] = 2*pi*Freq*Amp * \
+                sin(2*pi*Freq*(self.T - T_start) + Phase/57.3)
             self.cur_pos[AxisNumber - 1] += self.rate[AxisNumber - 1] * self.DT
             self.check_pos()
             self.pos_history[0] += [self.cur_pos[0]]
@@ -172,5 +185,7 @@ class rotary_table_2d:
         self.rate = [0, 0]
 
     def check_pos(self):
-        self.cur_pos[0] = self.cur_pos[0] % 360
-        self.cur_pos[1] = self.cur_pos[1] % 360
+        self.cur_pos[0] = self.cur_pos[0] % 360 if self.cur_pos[0] > 0 else (
+            360 - abs(self.cur_pos[0])) % 360
+        self.cur_pos[1] = self.cur_pos[1] % 360 if self.cur_pos[1] > 0 else (
+            360 - abs(self.cur_pos[1])) % 360
